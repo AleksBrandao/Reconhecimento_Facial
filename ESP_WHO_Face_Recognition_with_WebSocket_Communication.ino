@@ -30,6 +30,13 @@
 //const char* ssid = "INTELBRAS";
 //const char* password = "Anaenena";
 
+// Set your Static IP address
+IPAddress local_IP(192, 168, 15, 253);
+// Set your Gateway IP address
+IPAddress gateway(192, 168, 15, 1);
+IPAddress subnet(255, 255, 0, 0);
+//IPAddress primaryDNS(8, 8, 8, 8); //optional
+//IPAddress secondaryDNS(8, 8, 4, 4); //optional
 
 
 const char* ssid = "VIVOFIBRA-5221";
@@ -331,6 +338,10 @@ s->set_framesize(s, FRAMESIZE_QVGA);
 
 
  // Inicializa o servidor HTTP e WebSocket
+ 
+ if(!WiFi.config(local_IP, gateway, subnet)) {
+  Serial.println("STA Failed to configure");
+  }
   WiFi.begin(ssid, password);
   while (WiFi.status() != WL_CONNECTED) {
     delay(500);
