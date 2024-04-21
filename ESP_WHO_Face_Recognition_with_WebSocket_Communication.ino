@@ -30,15 +30,20 @@
 // const char* password = "Anaenena";
 
 // Set your Static IP address
-IPAddress local_IP(192, 168, 15, 253);
+// IPAddress local_IP(192, 168, 15, 253);
+IPAddress local_IP(10, 0, 0, 253);
 // Set your Gateway IP address
-IPAddress gateway(192, 168, 15, 1);
+// IPAddress gateway(192, 168, 15, 1);
+IPAddress gateway(10, 0, 0, 1);
 IPAddress subnet(255, 255, 0, 0);
 // IPAddress primaryDNS(8, 8, 8, 8); //optional
 // IPAddress secondaryDNS(8, 8, 4, 4); //optional
 
-const char *ssid = "VIVOFIBRA-5221";
-const char *password = "kPcsBo9tdC";
+// const char *ssid = "VIVOFIBRA-5221";
+// const char *password = "kPcsBo9tdC";
+
+const char *ssid = "INTELBRAS";
+const char *password = "Anaenena";
 
 /* #define ENROLL_CONFIRM_TIMES 5: Esta constante define o número de confirmações necessárias para concluir o processo de enroll de uma nova face.
 Por exemplo, se ENROLL_CONFIRM_TIMES for 5, significa que são necessárias 5 amostras de rosto para concluir o processo de cadastro dessa face.
