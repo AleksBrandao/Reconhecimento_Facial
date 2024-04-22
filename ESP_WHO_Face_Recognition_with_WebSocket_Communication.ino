@@ -1,5 +1,6 @@
 
-
+// esp 32-cam Endereço MAC: 24:DC:C3:AC:AD:FC
+// esp32 Endereço MAC: EC:64:C9:85:AE:B4
 #include <ArduinoWebsockets.h>
 #include "esp_http_server.h"
 #include "esp_timer.h"
@@ -9,6 +10,14 @@
 #include "fd_forward.h"
 #include "fr_forward.h"
 #include "fr_flash.h"
+
+#include <esp_now.h>
+#include <WiFi.h>
+
+// Definição do nome do dispositivo
+#define DEVICE_NAME "ESP32CAM"
+
+uint8_t partnerMacAddress[] = {0xEC, 0x64, 0xC9, 0x85, 0xAE, 0xB4};
 
 IPAddress local_IP(10, 0, 0, 253);
 
@@ -92,6 +101,16 @@ typedef struct
 } httpd_resp_value;
 
 httpd_resp_value st_name;
+
+// Função de callback para processar mensagens recebidas
+void OnDataRecv(const uint8_t *mac_addr, const uint8_t *data, int data_len) {
+  Serial.print("Mensagem ESPNOW recebida de ");
+  Serial.print((char*)mac_addr);
+  Serial.print(": ");
+  Serial.println((char*)data);
+}
+
+esp_now_peer_info_t peerInfo;
 
 void setup()
 {
@@ -185,6 +204,26 @@ void setup()
   }
   Serial.println("");
   Serial.println("WiFi connected");
+
+// Inicializar o ESP-NOW
+  if (esp_now_init() != ESP_OK) {
+    Serial.println("Erro ao inicializar o ESP-NOW");
+    return;
+  }
+
+   // Configurar a função de callback para receber mensagens
+  esp_now_register_recv_cb(OnDataRecv);
+
+  // Registrar o parceiro
+  // esp_now_peer_info_t peerInfo;
+  memcpy(peerInfo.peer_addr, partnerMacAddress, 6);
+  peerInfo.channel = 0;
+  peerInfo.encrypt = false;
+
+  if (esp_now_add_peer(&peerInfo) != ESP_OK) {
+    Serial.println("Falha ao adicionar o parceiro");
+    return;
+  }
 
   app_httpserver_init();
   app_facenet_main();
@@ -411,4 +450,16 @@ void loop()
     esp_camera_fb_return(fb);
     fb = NULL;
   }
+
+  // Enviar a mensagem
+  const char* message = "Hello World";
+  esp_err_t result = esp_now_send(partnerMacAddress, (uint8_t*)message, strlen(message));
+  if (result == ESP_OK) {
+    Serial.println("Mensagem ESPNOW enviada com sucesso");
+  } else {
+    Serial.println("Erro ao enviar a mensagem ESPNOW");
+  }
+
+  delay(5000); // Espera 5 segundos antes de enviar novamente
+
 }
