@@ -105,7 +105,7 @@ httpd_resp_value st_name;
 // Função de callback para processar mensagens recebidas
 void OnDataRecv(const uint8_t *mac_addr, const uint8_t *data, int data_len) {
   Serial.print("Mensagem ESPNOW recebida de ");
-  Serial.print((char*)mac_addr);
+  Serial.print(DEVICE_NAME);
   Serial.print(": ");
   Serial.println((char*)data);
 }
