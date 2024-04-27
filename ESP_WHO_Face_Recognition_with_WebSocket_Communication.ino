@@ -1,6 +1,9 @@
 
 // esp 32-cam Endereço MAC: 24:DC:C3:AC:AD:FC
 // esp32 Endereço MAC: EC:64:C9:85:AE:B4
+
+// fd_forward.h: No such file or directory
+// https://www.youtube.com/watch?v=knxe3zkd6rA
 #include <ArduinoWebsockets.h>
 #include "esp_http_server.h"
 #include "esp_timer.h"
@@ -10,9 +13,15 @@
 #include "fd_forward.h"
 #include "fr_forward.h"
 #include "fr_flash.h"
-
+// #include <Arduino.h> 
 #include <esp_now.h>
 #include <WiFi.h>
+
+// #include <Firebase_ESP_Client.h>
+// Provide the token generation process info.
+// #include "addons/TokenHelper.h"
+//Provide the RTDB payload printing info and other helper functions.
+// #include "addons/RTDBHelper.h"
 
 // Definição do nome do dispositivo
 #define DEVICE_NAME "ESP32CAM"
@@ -26,6 +35,26 @@ IPAddress subnet(255, 255, 0, 0);
 
 const char *ssid = "INTELBRAS";
 const char *password = "Anaenena";
+
+// Insert Firebase project API Key
+#define API_KEY "AIzaSyAJn68X4FRmxdk8NMu0ir9LwRsrIr7j7F0"
+
+// Insert RTDB URLefine the RTDB URL */
+#define DATABASE_URL "https://reconhecimento-facial-cbae7-default-rtdb.firebaseio.com" 
+
+#define USER_EMAIL "aleks.brandao@gmail.com"
+#define USER_PASSWORD "reconhecimento"
+
+//Define Firebase Data object
+// FirebaseData fbdo;
+
+// FirebaseAuth auth;
+// FirebaseConfig config;
+
+// unsigned long sendDataPrevMillis = 0;
+// int count = 0;
+// bool signupOK = false;
+
 
 #define ENROLL_CONFIRM_TIMES 5
 #define FACE_ID_SAVE_NUMBER 7
@@ -234,6 +263,31 @@ void setup()
   Serial.println("' to connect");
 }
 
+/* Assign the api key (required) */
+  // config.api_key = API_KEY;
+
+  /* Assign the RTDB URL (required) */
+  // config.database_url = DATABASE_URL;
+
+  // auth.user.email = USER_EMAIL;
+  // auth.user.password = USER_PASSWORD;
+
+  /* Sign up */
+  // if (Firebase.signUp(&config, &auth, "", "")){
+  //   Serial.println("ok");
+  //   signupOK = true;
+  // }
+  // else{
+  //   Serial.printf("%s\n", config.signer.signupError.message.c_str());
+  // }
+
+  /* Assign the callback function for the long running token generation task */
+  // config.token_status_callback = tokenStatusCallback; //see addons/TokenHelper.h
+  
+  // Firebase.begin(&config, &auth);
+  // Firebase.reconnectWiFi(true);
+
+
 static esp_err_t index_handler(httpd_req_t *req)
 {
   httpd_resp_set_type(req, "text/html");
@@ -361,6 +415,44 @@ void handle_message(WebsocketsClient &client, WebsocketsMessage msg)
 
 void loop()
 {
+
+  // if (Firebase.ready() && signupOK && (millis() - sendDataPrevMillis > 60000 || sendDataPrevMillis == 0)){
+  //   sendDataPrevMillis = millis();
+  //   // Write an Int number on the database path test/int
+  //   if (Firebase.RTDB.pushInt(&fbdo, "test/int", count)){
+  //     Serial.println("PASSED");
+  //     Serial.println("PATH: " + fbdo.dataPath());
+  //     Serial.println("TYPE: " + fbdo.dataType());
+  //   }
+  //   else {
+  //     Serial.println("FAILED");
+  //     Serial.println("REASON: " + fbdo.errorReason());
+  //   }
+  //   count++;
+    
+  //   // Write an Float number on the database path test/float
+  //   if (Firebase.RTDB.pushFloat(&fbdo, "test/float", 0.01 + random(0,100))){
+  //     Serial.println("PASSED");
+  //     Serial.println("PATH: " + fbdo.dataPath());
+  //     Serial.println("TYPE: " + fbdo.dataType());
+  //   }
+  //   else {
+  //     Serial.println("FAILED");
+  //     Serial.println("REASON: " + fbdo.errorReason());
+  //   }
+
+  //    if (Firebase.RTDB.pushDev(&fbdo, "test/Dev", DEVICE_NAME)){
+  //     Serial.println("PASSED");
+  //     Serial.println("PATH: " + fbdo.dataPath());
+  //     Serial.println("TYPE: " + fbdo.dataType());
+  //   }
+  //   else {
+  //     Serial.println("FAILED");
+  //     Serial.println("REASON: " + fbdo.errorReason());
+  //   }
+
+  // }
+
   auto client = socket_server.accept();
   client.onMessage(handle_message);
   dl_matrix3du_t *image_matrix = dl_matrix3du_alloc(1, 320, 240, 3);
