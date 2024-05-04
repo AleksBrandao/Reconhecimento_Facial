@@ -21,44 +21,51 @@
 // #include <addons/TokenHelper.h>
 #include <esp_now.h>
 #include <WiFi.h>
+#include "SPIFFS.h"
 
-#include <Firebase_ESP_Client.h>
+
+// #include <Firebase_ESP_Client.h>
 // Provide the token generation process info.
-#include "addons/TokenHelper.h"
+// #include "addons/TokenHelper.h"
 //Provide the RTDB payload printing info and other helper functions.
-#include "addons/RTDBHelper.h"
+// #include "addons/RTDBHelper.h"
 
 // Definição do nome do dispositivo
 #define DEVICE_NAME "ESP32CAM"
 
 uint8_t partnerMacAddress[] = {0xEC, 0x64, 0xC9, 0x85, 0xAE, 0xB4};
 
-IPAddress local_IP(10, 0, 0, 253);
+// IPAddress local_IP(10, 0, 0, 253);
+// IPAddress gateway(10, 0, 0, 1);
 
-IPAddress gateway(10, 0, 0, 1);
+IPAddress local_IP(192, 168, 15, 253);
+IPAddress gateway(192, 168, 15, 1);
 IPAddress subnet(255, 255, 0, 0);
 
-const char *ssid = "INTELBRAS";
-const char *password = "Anaenena";
+// const char *ssid = "INTELBRAS";
+// const char *password = "Anaenena";
+
+const char *ssid = "VIVOFIBRA-5221";
+const char *password = "kPcsBo9tdC";
 
 // Insert Firebase project API Key
-#define API_KEY "AIzaSyAJn68X4FRmxdk8NMu0ir9LwRsrIr7j7F0"
+// #define API_KEY "AIzaSyAJn68X4FRmxdk8NMu0ir9LwRsrIr7j7F0"
 
 // Insert RTDB URLefine the RTDB URL */
-#define DATABASE_URL "https://reconhecimento-facial-cbae7-default-rtdb.firebaseio.com" 
+// #define DATABASE_URL "https://reconhecimento-facial-cbae7-default-rtdb.firebaseio.com" 
 
-#define USER_EMAIL "aleks.brandao@gmail.com"
-#define USER_PASSWORD "reconhecimento"
+// #define USER_EMAIL "aleks.brandao@gmail.com"
+// #define USER_PASSWORD "reconhecimento"
 
 //Define Firebase Data object
-FirebaseData fbdo;
+// FirebaseData fbdo;
 
-FirebaseAuth auth;
-FirebaseConfig config;
+// FirebaseAuth auth;
+// FirebaseConfig config;
 
-unsigned long sendDataPrevMillis = 0;
-int count = 0;
-bool signupOK = false;
+// unsigned long sendDataPrevMillis = 0;
+// int count = 0;
+// bool signupOK = false;
 
 
 #define ENROLL_CONFIRM_TIMES 5
@@ -142,7 +149,102 @@ void OnDataRecv(const uint8_t *mac_addr, const uint8_t *data, int data_len) {
   Serial.print(DEVICE_NAME);
   Serial.print(": ");
   Serial.println((char*)data);
+
+  // Convertendo os dados recebidos para uma string para fácil comparação
+  String message = String((char*)data);
+
+   // Dividindo a mensagem em comando e userID
+  int colonIndex  = message.indexOf(':');
+  if (colonIndex  != -1) {
+    String command = message.substring(0, colonIndex);
+    String userID = message.substring(colonIndex + 1);
+
+    // Exibir o comando e o ID do usuário
+    Serial.print("Comando: ");
+    Serial.println(command);
+    Serial.print("UserID: ");
+    Serial.println(userID);
+
+  // Verifica a mensagem e define o estado global g_state apropriadamente
+  if(command == "start_stream") {
+    g_state = START_STREAM;
+  } else if(command == "start_detect") {
+    g_state = START_DETECT;
+  } else if(command == "show_faces") {
+    g_state = SHOW_FACES;
+  } else if(command == "start_recognition") {
+    g_state = START_RECOGNITION;
+  } else if(command == "start_enroll") {
+    g_state = START_ENROLL;
+    // Copia userID para enroll_name
+      // memset(st_name.enroll_name, 0, sizeof(st_name.enroll_name)); // Limpa o buffer anterior
+      // userID.toCharArray(st_name.enroll_name, min(sizeof(st_name.enroll_name), userID.length() + 1));
+      // client.send("CAPTURING " + String(st_name.enroll_name)); // Envia confirmação de captura
+
+  } else if(command == "enroll_complete") {
+    g_state = ENROLL_COMPLETE;
+  } else if(command == "delete_all") {
+    g_state = DELETE_ALL;
+  }
+
+  // Informa o estado atual baseado na mensagem recebida
+  Serial.print("Estado atual: ");
+  switch(g_state) {
+    case START_STREAM:
+      Serial.println("Iniciando transmissão...");
+      break;
+    case START_DETECT:
+      Serial.println("Iniciando detecção...");
+      break;
+    case SHOW_FACES:
+      Serial.println("Mostrando rostos...");
+      break;
+    case START_RECOGNITION:
+      Serial.println("Iniciando reconhecimento...");
+      break;
+    case START_ENROLL:
+      Serial.println("Iniciando cadastro...");
+      break;
+    case ENROLL_COMPLETE:
+      Serial.println("Cadastro completo.");
+      break;
+    case DELETE_ALL:
+      Serial.println("Deletando todos os dados.");
+      break;
+  }
+   } else {
+    Serial.println("Formato de mensagem inválido!");
+  }
 }
+
+void logFileDetails() {
+  File root = SPIFFS.open("/");
+  File file = root.openNextFile();
+  while (file) {
+    Serial.print("File: ");
+    Serial.print(file.name());
+    Serial.print(" Size: ");
+    Serial.print(file.size());
+    Serial.println(" bytes");
+    file = root.openNextFile();
+  }
+}
+
+void logFileSystemInfo() {
+  Serial.print("Total space: ");
+  Serial.print(SPIFFS.totalBytes());
+  Serial.println(" bytes");
+
+  Serial.print("Used space: ");
+  Serial.print(SPIFFS.usedBytes());
+  Serial.println(" bytes");
+
+  Serial.print("Free space: ");
+  Serial.print(SPIFFS.totalBytes() - SPIFFS.usedBytes());
+  Serial.println(" bytes");
+}
+
+
 
 esp_now_peer_info_t peerInfo;
 
@@ -150,6 +252,16 @@ void setup()
 {
 
   Serial.begin(115200);
+
+  if (!SPIFFS.begin(true)) {
+    Serial.println("An Error has occurred while mounting SPIFFS");
+    return;
+}
+Serial.println("SPIFFS mounted successfully.");  // Log de sucesso
+
+logFileDetails(); // Listar arquivos e seus tamanhos
+logFileSystemInfo(); // Logar espaço total, usado e livre
+
 
   Serial.setDebugOutput(true);
 
@@ -258,6 +370,8 @@ void setup()
     Serial.println("Falha ao adicionar o parceiro");
     return;
   }
+  // Se chegou aqui, significa que o parceiro foi adicionado com sucesso.
+  Serial.println("Parceiro adicionado com sucesso!");
 
   app_httpserver_init();
   app_facenet_main();
@@ -269,28 +383,28 @@ void setup()
 }
 
 /* Assign the api key (required) */
-  config.api_key = API_KEY;
+  // config.api_key = API_KEY;
 
   /* Assign the RTDB URL (required) */
-  config.database_url = DATABASE_URL;
+  // config.database_url = DATABASE_URL;
 
   // auth.user.email = USER_EMAIL;
   // auth.user.password = USER_PASSWORD;
 
   /* Sign up */
-  if (Firebase.signUp(&config, &auth, "", "")){
-    Serial.println("ok");
-    signupOK = true;
-  }
-  else{
-    Serial.printf("%s\n", config.signer.signupError.message.c_str());
-  }
+  // if (Firebase.signUp(&config, &auth, "", "")){
+  //   Serial.println("ok");
+  //   signupOK = true;
+  // }
+  // else{
+  //   Serial.printf("%s\n", config.signer.signupError.message.c_str());
+  // }
 
-  /* Assign the callback function for the long running token generation task */
-  config.token_status_callback = tokenStatusCallback; //see addons/TokenHelper.h
+  // /* Assign the callback function for the long running token generation task */
+  // config.token_status_callback = tokenStatusCallback; //see addons/TokenHelper.h
   
-  Firebase.begin(&config, &auth);
-  Firebase.reconnectWiFi(true);
+  // Firebase.begin(&config, &auth);
+  // Firebase.reconnectWiFi(true);
 
 
 static esp_err_t index_handler(httpd_req_t *req)
@@ -332,14 +446,33 @@ void app_facenet_main()
 
   aligned_face = dl_matrix3du_alloc(1, FACE_WIDTH, FACE_HEIGHT, 3);
 
+  Serial.println("Loading face data...");
   read_face_id_from_flash_with_name(&st_face_list);
+  Serial.println("Face data loaded successfully.");
+
 }
 
 static inline int do_enrollment(face_id_name_list *face_list, dl_matrix3d_t *new_id)
 {
   ESP_LOGD(TAG, "START ENROLLING");
 
+  Serial.println("Attempting to enroll new face...");
   int left_sample_face = enroll_face_id_to_flash_with_name(face_list, new_id, st_name.enroll_name);
+ Serial.println("Saving face data...");
+bool result = enroll_face_id_to_flash_with_name(&st_face_list, new_id, st_name.enroll_name);
+if (result) {
+    Serial.println("Face data saved successfully.");
+
+     logFileDetails();  // Chama a função para logar os detalhes dos arquivos
+    logFileSystemInfo();  // Chama a função para logar as informações do sistema de arquivos
+
+
+} else {
+    Serial.println("Error saving face data!");
+}
+
+
+
   ESP_LOGD(TAG, "Face ID %s Enrollment: Sample %d",
            st_name.enroll_name,
            ENROLL_CONFIRM_TIMES - left_sample_face);
@@ -396,6 +529,19 @@ void handle_message(WebsocketsClient &client, WebsocketsMessage msg)
     client.send("CAPTURING");
   }
 
+  if (msg.data().substring(0, 12) == "START_ENROLL") { // Checa se o comando é START_ENROLL
+    g_state = START_ENROLL; // Define o estado global para iniciar o cadastro
+
+    // Preparação do array de caracteres para receber o nome após o comando
+    char person[FACE_ID_SAVE_NUMBER * ENROLL_NAME_LEN] = {0};
+    msg.data().substring(13).toCharArray(person, sizeof(person)); // Extrai o nome após "START_ENROLL:"
+    memcpy(st_name.enroll_name, person, strlen(person) + 1); // Copia o nome extraído para st_name.enroll_name
+
+    // Comunica de volta que o processo de captura está ativo
+    client.send("CAPTURING"); // Supondo que 'client' é uma instância válida de um objeto que pode enviar mensagens
+}
+
+
   if (msg.data() == "recognise")
   {
     g_state = START_RECOGNITION;
@@ -421,42 +567,42 @@ void handle_message(WebsocketsClient &client, WebsocketsMessage msg)
 void loop()
 {
 
-  if (Firebase.ready() && signupOK && (millis() - sendDataPrevMillis > 60000 || sendDataPrevMillis == 0)){
-    sendDataPrevMillis = millis();
-    // Write an Int number on the database path test/int
-    if (Firebase.RTDB.pushInt(&fbdo, "test/int", count)){
-      Serial.println("PASSED");
-      Serial.println("PATH: " + fbdo.dataPath());
-      Serial.println("TYPE: " + fbdo.dataType());
-    }
-    else {
-      Serial.println("FAILED");
-      Serial.println("REASON: " + fbdo.errorReason());
-    }
-    count++;
+  // if (Firebase.ready() && signupOK && (millis() - sendDataPrevMillis > 60000 || sendDataPrevMillis == 0)){
+  //   sendDataPrevMillis = millis();
+  //   // Write an Int number on the database path test/int
+  //   if (Firebase.RTDB.pushInt(&fbdo, "test/int", count)){
+  //     Serial.println("PASSED");
+  //     Serial.println("PATH: " + fbdo.dataPath());
+  //     Serial.println("TYPE: " + fbdo.dataType());
+  //   }
+  //   else {
+  //     Serial.println("FAILED");
+  //     Serial.println("REASON: " + fbdo.errorReason());
+  //   }
+  //   count++;
     
-    // Write an Float number on the database path test/float
-    if (Firebase.RTDB.pushFloat(&fbdo, "test/float", 0.01 + random(0,100))){
-      Serial.println("PASSED");
-      Serial.println("PATH: " + fbdo.dataPath());
-      Serial.println("TYPE: " + fbdo.dataType());
-    }
-    else {
-      Serial.println("FAILED");
-      Serial.println("REASON: " + fbdo.errorReason());
-    }
+  //   // Write an Float number on the database path test/float
+  //   if (Firebase.RTDB.pushFloat(&fbdo, "test/float", 0.01 + random(0,100))){
+  //     Serial.println("PASSED");
+  //     Serial.println("PATH: " + fbdo.dataPath());
+  //     Serial.println("TYPE: " + fbdo.dataType());
+  //   }
+  //   else {
+  //     Serial.println("FAILED");
+  //     Serial.println("REASON: " + fbdo.errorReason());
+  //   }
 
-     if (Firebase.RTDB.pushDev(&fbdo, "test/Dev", DEVICE_NAME)){
-      Serial.println("PASSED");
-      Serial.println("PATH: " + fbdo.dataPath());
-      Serial.println("TYPE: " + fbdo.dataType());
-    }
-    else {
-      Serial.println("FAILED");
-      Serial.println("REASON: " + fbdo.errorReason());
-    }
+  //    if (Firebase.RTDB.pushDev(&fbdo, "test/Dev", DEVICE_NAME)){
+  //     Serial.println("PASSED");
+  //     Serial.println("PATH: " + fbdo.dataPath());
+  //     Serial.println("TYPE: " + fbdo.dataType());
+  //   }
+  //   else {
+  //     Serial.println("FAILED");
+  //     Serial.println("REASON: " + fbdo.errorReason());
+  //   }
 
-  }
+  // }
 
   auto client = socket_server.accept();
   client.onMessage(handle_message);
@@ -491,21 +637,21 @@ void loop()
           last_detected_millis = millis();
           if (g_state == START_DETECT)
           {
-            client.send("FACE DETECTED");
+            client.send("ROSTO DETECTADO");
           }
 
           if (g_state == START_ENROLL)
           {
             int left_sample_face = do_enrollment(&st_face_list, out_res.face_id);
             char enrolling_message[64];
-            sprintf(enrolling_message, "SAMPLE NUMBER %d FOR %s", ENROLL_CONFIRM_TIMES - left_sample_face, st_name.enroll_name);
+            sprintf(enrolling_message, "NÚMERO DA AMOSTRA %d PARA %s", ENROLL_CONFIRM_TIMES - left_sample_face, st_name.enroll_name);
             client.send(enrolling_message);
             if (left_sample_face == 0)
             {
-              ESP_LOGI(TAG, "Enrolled Face ID: %s", st_face_list.tail->id_name);
+              ESP_LOGI(TAG, "ID facial inscrito: %s", st_face_list.tail->id_name);
               g_state = START_STREAM;
               char captured_message[64];
-              sprintf(captured_message, "FACE CAPTURED FOR %s", st_face_list.tail->id_name);
+              sprintf(captured_message, "ROSTO CAPTURADO PARA %s", st_face_list.tail->id_name);
               client.send(captured_message);
               send_face_list(client);
             }
@@ -517,28 +663,42 @@ void loop()
             if (f)
             {
               char recognised_message[64];
-              sprintf(recognised_message, "RECOGNISED %s", f->id_name);
+              sprintf(recognised_message, "RECONHECIDO %s", f->id_name);
               client.send(recognised_message);
+
+              // Enviar a mensagem
+              const char* message = "RECOGNISED";
+              esp_err_t result = esp_now_send(partnerMacAddress, (uint8_t*)message, strlen(message));
+              if (result == ESP_OK) {
+                Serial.println("Mensagem ESPNOW enviada com sucesso");
+              } else {
+                Serial.println("Erro ao enviar a mensagem ESPNOW");
+              }
+
+              
+              // delay(5000); // Espera 5 segundos antes de enviar novamente
+
             }
             else
             {
-              client.send("FACE NOT RECOGNISED");
+              client.send("ROSTO NÃO RECONHECIDO");
             }
           }
           dl_matrix3d_free(out_res.face_id);
+          // g_state = START_STREAM;
         }
       }
       else
       {
         if (g_state != START_DETECT)
         {
-          client.send("NO FACE DETECTED");
+          client.send("NENHUM ROSTO DETECTADO");
         }
       }
 
       if (g_state == START_DETECT && millis() - last_detected_millis > 500)
       {
-        client.send("DETECTING");
+        client.send("DETECTANDO");
       }
     }
 
@@ -548,15 +708,15 @@ void loop()
     fb = NULL;
   }
 
-  // Enviar a mensagem
-  const char* message = "Hello World";
-  esp_err_t result = esp_now_send(partnerMacAddress, (uint8_t*)message, strlen(message));
-  if (result == ESP_OK) {
-    Serial.println("Mensagem ESPNOW enviada com sucesso");
-  } else {
-    Serial.println("Erro ao enviar a mensagem ESPNOW");
-  }
+  // // Enviar a mensagem
+  // const char* message = "Hello World";
+  // esp_err_t result = esp_now_send(partnerMacAddress, (uint8_t*)message, strlen(message));
+  // if (result == ESP_OK) {
+  //   Serial.println("Mensagem ESPNOW enviada com sucesso");
+  // } else {
+  //   Serial.println("Erro ao enviar a mensagem ESPNOW");
+  // }
 
-  delay(5000); // Espera 5 segundos antes de enviar novamente
+  // delay(5000); // Espera 5 segundos antes de enviar novamente
 
 }
