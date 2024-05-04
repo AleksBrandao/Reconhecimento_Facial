@@ -1,6 +1,8 @@
 
 // esp 32-cam Endereço MAC: 24:DC:C3:AC:AD:FC
 // esp32 Endereço MAC: EC:64:C9:85:AE:B4
+//segunda esp 32-cam Endereço MAC: a0:a3:b3:2b:da:a0
+
 
 // fd_forward.h: No such file or directory
 // https://www.youtube.com/watch?v=knxe3zkd6rA
@@ -162,6 +164,11 @@ void OnDataRecv(const uint8_t *mac_addr, const uint8_t *data, int data_len) {
     g_state = SHOW_FACES;
   } else if (command == "start_recognition") {
     g_state = START_RECOGNITION;
+//    char person[FACE_ID_SAVE_NUMBER * ENROLL_NAME_LEN] = {0};
+//    command.toCharArray(person, sizeof(person));
+//    memcpy(st_name.enroll_name, person, strlen(person) + 1);
+//    Serial.println("Dados de usuário capturados: ");
+//    Serial.println(st_name.enroll_name);
   } else if (command == "start_enroll") {
     g_state = START_ENROLL;
   } else if (command == "enroll_complete") {
@@ -504,6 +511,8 @@ void handle_message(WebsocketsClient &client, WebsocketsMessage msg)
   if (msg.data().substring(0, 8) == "capture:")
   {
     g_state = START_ENROLL;
+
+    Serial.println("ESPNOW passa por aqui");
 
     char person[FACE_ID_SAVE_NUMBER * ENROLL_NAME_LEN] = {
         0,
