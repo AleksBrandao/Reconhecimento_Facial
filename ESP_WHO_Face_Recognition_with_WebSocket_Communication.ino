@@ -151,40 +151,26 @@ void OnDataRecv(const uint8_t *mac_addr, const uint8_t *data, int data_len) {
   Serial.println((char*)data);
 
   // Convertendo os dados recebidos para uma string para fácil comparação
-  String message = String((char*)data);
-
-   // Dividindo a mensagem em comando e userID
-  int colonIndex  = message.indexOf(':');
-  if (colonIndex  != -1) {
-    String command = message.substring(0, colonIndex);
-    String userID = message.substring(colonIndex + 1);
-
-    // Exibir o comando e o ID do usuário
-    Serial.print("Comando: ");
-    Serial.println(command);
-    Serial.print("UserID: ");
-    Serial.println(userID);
+  String command = String((char*)data);
 
   // Verifica a mensagem e define o estado global g_state apropriadamente
-  if(command == "start_stream") {
+  if (command == "start_stream") {
     g_state = START_STREAM;
-  } else if(command == "start_detect") {
+  } else if (command == "start_detect") {
     g_state = START_DETECT;
-  } else if(command == "show_faces") {
+  } else if (command == "show_faces") {
     g_state = SHOW_FACES;
-  } else if(command == "start_recognition") {
+  } else if (command == "start_recognition") {
     g_state = START_RECOGNITION;
-  } else if(command == "start_enroll") {
+  } else if (command == "start_enroll") {
     g_state = START_ENROLL;
-    // Copia userID para enroll_name
-      // memset(st_name.enroll_name, 0, sizeof(st_name.enroll_name)); // Limpa o buffer anterior
-      // userID.toCharArray(st_name.enroll_name, min(sizeof(st_name.enroll_name), userID.length() + 1));
-      // client.send("CAPTURING " + String(st_name.enroll_name)); // Envia confirmação de captura
-
-  } else if(command == "enroll_complete") {
+  } else if (command == "enroll_complete") {
     g_state = ENROLL_COMPLETE;
-  } else if(command == "delete_all") {
+  } else if (command == "delete_all") {
     g_state = DELETE_ALL;
+  } else {
+    Serial.println("Formato de mensagem inválido!");
+    return; // Usar return para terminar a função se o formato for inválido
   }
 
   // Informa o estado atual baseado na mensagem recebida
@@ -212,10 +198,8 @@ void OnDataRecv(const uint8_t *mac_addr, const uint8_t *data, int data_len) {
       Serial.println("Deletando todos os dados.");
       break;
   }
-   } else {
-    Serial.println("Formato de mensagem inválido!");
-  }
 }
+
 
 void logFileDetails() {
   File root = SPIFFS.open("/");
@@ -529,17 +513,17 @@ void handle_message(WebsocketsClient &client, WebsocketsMessage msg)
     client.send("CAPTURING");
   }
 
-  if (msg.data().substring(0, 12) == "START_ENROLL") { // Checa se o comando é START_ENROLL
-    g_state = START_ENROLL; // Define o estado global para iniciar o cadastro
+  // if (msg.data().substring(0, 12) == "START_ENROLL") { // Checa se o comando é START_ENROLL
+  //   g_state = START_ENROLL; // Define o estado global para iniciar o cadastro
 
-    // Preparação do array de caracteres para receber o nome após o comando
-    char person[FACE_ID_SAVE_NUMBER * ENROLL_NAME_LEN] = {0};
-    msg.data().substring(13).toCharArray(person, sizeof(person)); // Extrai o nome após "START_ENROLL:"
-    memcpy(st_name.enroll_name, person, strlen(person) + 1); // Copia o nome extraído para st_name.enroll_name
+  //   // Preparação do array de caracteres para receber o nome após o comando
+  //   char person[FACE_ID_SAVE_NUMBER * ENROLL_NAME_LEN] = {0};
+  //   msg.data().substring(13).toCharArray(person, sizeof(person)); // Extrai o nome após "START_ENROLL:"
+  //   memcpy(st_name.enroll_name, person, strlen(person) + 1); // Copia o nome extraído para st_name.enroll_name
 
-    // Comunica de volta que o processo de captura está ativo
-    client.send("CAPTURING"); // Supondo que 'client' é uma instância válida de um objeto que pode enviar mensagens
-}
+  //   // Comunica de volta que o processo de captura está ativo
+  //   client.send("CAPTURING"); // Supondo que 'client' é uma instância válida de um objeto que pode enviar mensagens
+  // }
 
 
   if (msg.data() == "recognise")
