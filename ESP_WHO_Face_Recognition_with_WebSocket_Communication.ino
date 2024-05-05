@@ -2,11 +2,8 @@
 // esp 32-cam Endereço MAC: 24:DC:C3:AC:AD:FC
 // esp32 Endereço MAC: EC:64:C9:85:AE:B4
 //segunda esp 32-cam Endereço MAC: a0:a3:b3:2b:da:a0
-
-
 // fd_forward.h: No such file or directory
 // https://www.youtube.com/watch?v=knxe3zkd6rA
-
 // esp32 em 1.0.6
 // Firebase_ESP_Client em 2.3.7
 
@@ -19,64 +16,23 @@
 #include "fd_forward.h"
 #include "fr_forward.h"
 #include "fr_flash.h"
-// #include <Arduino.h> 
-// #include <addons/TokenHelper.h>
 #include <esp_now.h>
 #include <WiFi.h>
 #include "SPIFFS.h"
-
-
-// #include <Firebase_ESP_Client.h>
-// Provide the token generation process info.
-// #include "addons/TokenHelper.h"
-//Provide the RTDB payload printing info and other helper functions.
-// #include "addons/RTDBHelper.h"
-
-// Definição do nome do dispositivo
 #define DEVICE_NAME "ESP32CAM"
 
 uint8_t partnerMacAddress[] = {0xEC, 0x64, 0xC9, 0x85, 0xAE, 0xB4};
-
-// IPAddress local_IP(10, 0, 0, 253);
-// IPAddress gateway(10, 0, 0, 1);
 
 IPAddress local_IP(192, 168, 15, 253);
 IPAddress gateway(192, 168, 15, 1);
 IPAddress subnet(255, 255, 0, 0);
 
-// const char *ssid = "INTELBRAS";
-// const char *password = "Anaenena";
-
 const char *ssid = "VIVOFIBRA-5221";
 const char *password = "kPcsBo9tdC";
-
-// Insert Firebase project API Key
-// #define API_KEY "AIzaSyAJn68X4FRmxdk8NMu0ir9LwRsrIr7j7F0"
-
-// Insert RTDB URLefine the RTDB URL */
-// #define DATABASE_URL "https://reconhecimento-facial-cbae7-default-rtdb.firebaseio.com" 
-
-// #define USER_EMAIL "aleks.brandao@gmail.com"
-// #define USER_PASSWORD "reconhecimento"
-
-//Define Firebase Data object
-// FirebaseData fbdo;
-
-// FirebaseAuth auth;
-// FirebaseConfig config;
-
-// unsigned long sendDataPrevMillis = 0;
-// int count = 0;
-// bool signupOK = false;
-
 
 #define ENROLL_CONFIRM_TIMES 5
 #define FACE_ID_SAVE_NUMBER 7
 
-//#define CAMERA_MODEL_WROVER_KIT
-//#define CAMERA_MODEL_ESP_EYE
-//#define CAMERA_MODEL_M5STACK_PSRAM
-//#define CAMERA_MODEL_M5STACK_WIDE
 #define CAMERA_MODEL_AI_THINKER
 #include "camera_pins.h"
 
@@ -207,36 +163,6 @@ void OnDataRecv(const uint8_t *mac_addr, const uint8_t *data, int data_len) {
   }
 }
 
-
-void logFileDetails() {
-  File root = SPIFFS.open("/");
-  File file = root.openNextFile();
-  while (file) {
-    Serial.print("File: ");
-    Serial.print(file.name());
-    Serial.print(" Size: ");
-    Serial.print(file.size());
-    Serial.println(" bytes");
-    file = root.openNextFile();
-  }
-}
-
-void logFileSystemInfo() {
-  Serial.print("Total space: ");
-  Serial.print(SPIFFS.totalBytes());
-  Serial.println(" bytes");
-
-  Serial.print("Used space: ");
-  Serial.print(SPIFFS.usedBytes());
-  Serial.println(" bytes");
-
-  Serial.print("Free space: ");
-  Serial.print(SPIFFS.totalBytes() - SPIFFS.usedBytes());
-  Serial.println(" bytes");
-}
-
-
-
 esp_now_peer_info_t peerInfo;
 
 void setup()
@@ -249,10 +175,6 @@ void setup()
     return;
 }
 Serial.println("SPIFFS mounted successfully.");  // Log de sucesso
-
-logFileDetails(); // Listar arquivos e seus tamanhos
-logFileSystemInfo(); // Logar espaço total, usado e livre
-
 
   Serial.setDebugOutput(true);
 
@@ -296,8 +218,6 @@ logFileSystemInfo(); // Logar espaço total, usado e livre
     config.fb_count = 1;
   }
 
-  //#if defined(CAMERA_MODEL_ESP_EYE): Esta diretiva de pré-processador verifica se o símbolo CAMERA_MODEL_ESP_EYE está definido. Isso geralmente é feito através de definições condicionais
-
 #if defined(CAMERA_MODEL_ESP_EYE)
 
   pinMode(13, INPUT_PULLUP);
@@ -317,8 +237,6 @@ logFileSystemInfo(); // Logar espaço total, usado e livre
   sensor_t *s = esp_camera_sensor_get();
 
   s->set_framesize(s, FRAMESIZE_QVGA);
-
-  //#if defined(CAMERA_MODEL_M5STACK_WIDE): Esta diretiva de pré-processador verifica se o símbolo CAMERA_MODEL_M5STACK_WIDE está definido, indicando que o modelo da câmera é o "M5Stack Wide".
 
 #if defined(CAMERA_MODEL_M5STACK_WIDE)
 
@@ -372,30 +290,6 @@ logFileSystemInfo(); // Logar espaço total, usado e livre
   Serial.print(WiFi.localIP());
   Serial.println("' to connect");
 }
-
-/* Assign the api key (required) */
-  // config.api_key = API_KEY;
-
-  /* Assign the RTDB URL (required) */
-  // config.database_url = DATABASE_URL;
-
-  // auth.user.email = USER_EMAIL;
-  // auth.user.password = USER_PASSWORD;
-
-  /* Sign up */
-  // if (Firebase.signUp(&config, &auth, "", "")){
-  //   Serial.println("ok");
-  //   signupOK = true;
-  // }
-  // else{
-  //   Serial.printf("%s\n", config.signer.signupError.message.c_str());
-  // }
-
-  // /* Assign the callback function for the long running token generation task */
-  // config.token_status_callback = tokenStatusCallback; //see addons/TokenHelper.h
-  
-  // Firebase.begin(&config, &auth);
-  // Firebase.reconnectWiFi(true);
 
 
 static esp_err_t index_handler(httpd_req_t *req)
@@ -453,11 +347,6 @@ static inline int do_enrollment(face_id_name_list *face_list, dl_matrix3d_t *new
 bool result = enroll_face_id_to_flash_with_name(&st_face_list, new_id, st_name.enroll_name);
 if (result) {
     Serial.println("Face data saved successfully.");
-
-     logFileDetails();  // Chama a função para logar os detalhes dos arquivos
-    logFileSystemInfo();  // Chama a função para logar as informações do sistema de arquivos
-
-
 } else {
     Serial.println("Error saving face data!");
 }
@@ -522,19 +411,6 @@ void handle_message(WebsocketsClient &client, WebsocketsMessage msg)
     client.send("CAPTURING");
   }
 
-  // if (msg.data().substring(0, 12) == "START_ENROLL") { // Checa se o comando é START_ENROLL
-  //   g_state = START_ENROLL; // Define o estado global para iniciar o cadastro
-
-  //   // Preparação do array de caracteres para receber o nome após o comando
-  //   char person[FACE_ID_SAVE_NUMBER * ENROLL_NAME_LEN] = {0};
-  //   msg.data().substring(13).toCharArray(person, sizeof(person)); // Extrai o nome após "START_ENROLL:"
-  //   memcpy(st_name.enroll_name, person, strlen(person) + 1); // Copia o nome extraído para st_name.enroll_name
-
-  //   // Comunica de volta que o processo de captura está ativo
-  //   client.send("CAPTURING"); // Supondo que 'client' é uma instância válida de um objeto que pode enviar mensagens
-  // }
-
-
   if (msg.data() == "recognise")
   {
     g_state = START_RECOGNITION;
@@ -560,44 +436,7 @@ void handle_message(WebsocketsClient &client, WebsocketsMessage msg)
 void loop()
 {
 
-  // if (Firebase.ready() && signupOK && (millis() - sendDataPrevMillis > 60000 || sendDataPrevMillis == 0)){
-  //   sendDataPrevMillis = millis();
-  //   // Write an Int number on the database path test/int
-  //   if (Firebase.RTDB.pushInt(&fbdo, "test/int", count)){
-  //     Serial.println("PASSED");
-  //     Serial.println("PATH: " + fbdo.dataPath());
-  //     Serial.println("TYPE: " + fbdo.dataType());
-  //   }
-  //   else {
-  //     Serial.println("FAILED");
-  //     Serial.println("REASON: " + fbdo.errorReason());
-  //   }
-  //   count++;
-    
-  //   // Write an Float number on the database path test/float
-  //   if (Firebase.RTDB.pushFloat(&fbdo, "test/float", 0.01 + random(0,100))){
-  //     Serial.println("PASSED");
-  //     Serial.println("PATH: " + fbdo.dataPath());
-  //     Serial.println("TYPE: " + fbdo.dataType());
-  //   }
-  //   else {
-  //     Serial.println("FAILED");
-  //     Serial.println("REASON: " + fbdo.errorReason());
-  //   }
-
-  //    if (Firebase.RTDB.pushDev(&fbdo, "test/Dev", DEVICE_NAME)){
-  //     Serial.println("PASSED");
-  //     Serial.println("PATH: " + fbdo.dataPath());
-  //     Serial.println("TYPE: " + fbdo.dataType());
-  //   }
-  //   else {
-  //     Serial.println("FAILED");
-  //     Serial.println("REASON: " + fbdo.errorReason());
-  //   }
-
-  // }
-
-  auto client = socket_server.accept();
+   auto client = socket_server.accept();
   client.onMessage(handle_message);
   dl_matrix3du_t *image_matrix = dl_matrix3du_alloc(1, 320, 240, 3);
   http_img_process_result out_res = {0};
@@ -701,15 +540,5 @@ void loop()
     fb = NULL;
   }
 
-  // // Enviar a mensagem
-  // const char* message = "Hello World";
-  // esp_err_t result = esp_now_send(partnerMacAddress, (uint8_t*)message, strlen(message));
-  // if (result == ESP_OK) {
-  //   Serial.println("Mensagem ESPNOW enviada com sucesso");
-  // } else {
-  //   Serial.println("Erro ao enviar a mensagem ESPNOW");
-  // }
-
-  // delay(5000); // Espera 5 segundos antes de enviar novamente
 
 }
