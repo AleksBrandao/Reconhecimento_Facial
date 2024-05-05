@@ -19,6 +19,11 @@
 #include <esp_now.h>
 #include <WiFi.h>
 #include "SPIFFS.h"
+
+#include "FS.h"
+#include "SD_MMC.h"
+
+
 #define DEVICE_NAME "ESP32CAM"
 
 uint8_t partnerMacAddress[] = {0xEC, 0x64, 0xC9, 0x85, 0xAE, 0xB4};
@@ -169,6 +174,26 @@ void setup()
 {
 
   Serial.begin(115200);
+
+ if (!SD_MMC.begin()) {
+    Serial.println("Falha ao inicializar o cartão SD");
+    return;
+  }
+  Serial.println("Cartão SD inicializado");
+
+  // Abre o arquivo para escrita
+  File file = SD_MMC.open("/teste.txt", FILE_WRITE);
+  if (!file) {
+    Serial.println("Erro ao abrir o arquivo");
+    return;
+  }
+
+  // Escreve no arquivo
+  file.println("Hello, SD card!");
+  file.close();
+
+  Serial.println("Escrita concluída");
+
 
   if (!SPIFFS.begin(true)) {
     Serial.println("An Error has occurred while mounting SPIFFS");
