@@ -32,21 +32,22 @@
 
 // Definição do nome do dispositivo
 #define DEVICE_NAME "ESP32CAM"
+#define LED_PIN 4  // Define o pino do LED
 
 uint8_t partnerMacAddress[] = {0xEC, 0x64, 0xC9, 0x85, 0xAE, 0xB4};
 
-// IPAddress local_IP(10, 0, 0, 253);
-// IPAddress gateway(10, 0, 0, 1);
+ IPAddress local_IP(10, 0, 0, 253);
+ IPAddress gateway(10, 0, 0, 1);
 //
-IPAddress local_IP(192, 168, 15, 253);
-IPAddress gateway(192, 168, 15, 1);
+//IPAddress local_IP(192, 168, 15, 253);
+//IPAddress gateway(192, 168, 15, 1);
 IPAddress subnet(255, 255, 0, 0);
 
-// const char *ssid = "INTELBRAS";
-// const char *password = "Anaenena";
+ const char *ssid = "INTELBRAS";
+ const char *password = "Anaenena";
 
-const char *ssid = "VIVOFIBRA-5221";
-const char *password = "kPcsBo9tdC";
+//const char *ssid = "VIVOFIBRA-5221";
+//const char *password = "kPcsBo9tdC";
 
 
 //const char *ssid = "Galaxy AB";
@@ -147,6 +148,8 @@ typedef struct
 
 httpd_resp_value st_name;
 
+
+  WebsocketsClient connectedClient;  // Global client to send data to
 // Função de callback para processar mensagens recebidas
 void OnDataRecv(const uint8_t *mac_addr, const uint8_t *data, int data_len) {
   Serial.print("Mensagem ESPNOW recebida de ");
@@ -155,7 +158,29 @@ void OnDataRecv(const uint8_t *mac_addr, const uint8_t *data, int data_len) {
   Serial.println((char*)data);
 
   // Convertendo os dados recebidos para uma string para fácil comparação
-  String command = String((char*)data);
+  String dataStr = String((char*)data);
+
+   // Encontra a posição do delimitador ':'
+  int delimiterIndex = dataStr.indexOf(':');
+
+  // Se o delimitador não for encontrado, imprime um erro e retorna
+  if (delimiterIndex == -1) {
+    Serial.println("Delimitador ':' não encontrado na mensagem!");
+    return;
+  }
+
+  // Extrai a parte do comando, que está antes do delimitador
+  String command = dataStr.substring(0, delimiterIndex);
+
+  // Extrai os dados adicionais, que estão depois do delimitador
+  String additionalData = dataStr.substring(delimiterIndex + 1);
+  additionalData.trim(); // Aplica trim para remover espaços iniciais
+
+  Serial.print("Comando: ");
+  Serial.println(command);
+  Serial.print("Dados Adicionais: ");
+  Serial.println(additionalData);
+  
 
   // Verifica a mensagem e define o estado global g_state apropriadamente
   if (command == "start_stream") {
@@ -166,8 +191,17 @@ void OnDataRecv(const uint8_t *mac_addr, const uint8_t *data, int data_len) {
     g_state = SHOW_FACES;
   } else if (command == "start_recognition") {
     g_state = START_RECOGNITION;
-  } else if (command == "start_enroll") {
-    g_state = START_ENROLL;
+  } else if (command == "capture") {
+
+     // Send the message via WebSocket if the client is available
+//  if(connectedClient.available()) {
+//    connectedClient.send("capture:teste");
+    handle_message1(connectedClient, String(dataStr));
+    Serial.println("Websocket enviado");
+    
+//  }
+  
+//    g_state = START_ENROLL;
   } else if (command == "enroll_complete") {
     g_state = ENROLL_COMPLETE;
   } else if (command == "delete_all") {
@@ -240,6 +274,8 @@ void setup()
 {
 
   Serial.begin(115200);
+
+  pinMode(LED_PIN, OUTPUT);  // Configura o pino do LED como saída
 
   if (!SPIFFS.begin(true)) {
     Serial.println("An Error has occurred while mounting SPIFFS");
@@ -344,6 +380,8 @@ void setup()
     Serial.println("Erro ao inicializar o ESP-NOW");
     return;
   }
+
+
 
   // Configurar a função de callback para receber mensagens
   esp_now_register_recv_cb(OnDataRecv);
@@ -553,6 +591,53 @@ void handle_message(WebsocketsClient &client, WebsocketsMessage msg)
   }
 }
 
+void handle_message1(WebsocketsClient &client, const String &data) {
+  if (data == "stream") {
+    g_state = START_STREAM;
+    client.send("STREAMING");
+  } else if (data == "detect") {
+    g_state = START_DETECT;
+    client.send("DETECTING");
+  } else if (data.startsWith("capture:")) {
+    g_state = START_ENROLL;
+     Serial.println("PASSED START_ENROLL");
+//-----------
+ // Alocando o array de caracteres para o nome da pessoa
+    char person[FACE_ID_SAVE_NUMBER * ENROLL_NAME_LEN] = {0};
+
+    // Extraindo o nome da pessoa a partir do comando
+    String personName = data.substring(8);
+    personName.toCharArray(person, sizeof(person));
+
+    // Copiando o nome para a variável de estrutura (assumindo que st_name é uma estrutura disponível)
+    memcpy(st_name.enroll_name, person, strlen(person) + 1);
+
+    // Enviando a resposta de captura para o cliente WebSocket
+    client.send("CAPTURING");
+    
+//    -------------------
+//    client.send("CAPTURING");
+  } else if (data == "recognise") {
+    g_state = START_RECOGNITION;
+    client.send("RECOGNISING");
+  } else if (data.startsWith("remove:")) {
+    // Processamento específico de 'remove'
+    client.send("REMOVED");
+  } else if (data == "delete_all") {
+    // Processamento específico de 'delete_all'
+    client.send("ALL DELETED");
+  } else {
+    client.send("COMMAND UNKNOWN");
+  }
+}
+
+void blinkLed() {
+    digitalWrite(LED_PIN, HIGH);  // Acende o LED
+    delay(200);                  // Mantém o LED aceso por 200 milissegundos
+    digitalWrite(LED_PIN, LOW);   // Apaga o LED
+}
+
+
 void loop()
 {
 
@@ -655,16 +740,27 @@ void loop()
               sprintf(recognised_message, "RECONHECIDO %s", f->id_name);
               client.send(recognised_message);
 
+              // Chame a função blinkLed() para piscar o LED
+              blinkLed();
+
               // Enviar a mensagem
-              const char* message = "RECOGNISED";
-              esp_err_t result = esp_now_send(partnerMacAddress, (uint8_t*)message, strlen(message));
-              if (result == ESP_OK) {
-                Serial.println("Mensagem ESPNOW enviada com sucesso");
-              } else {
-                Serial.println("Erro ao enviar a mensagem ESPNOW");
-              }
-
-
+//              const char* message = "RECOGNISED";
+                  char espnow_message[64];  // Certifique-se de que o buffer é grande o suficiente.
+                  sprintf(espnow_message, "RECOGNISED: %s", f->id_name);  // Formata a string com o id_name
+                  delay(100); // Delay de 100ms antes de enviar a próxima mensagem
+  
+  //              esp_err_t result = esp_now_send(partnerMacAddress, (uint8_t*)message, strlen(message));
+                  esp_err_t result = esp_now_send(partnerMacAddress, (uint8_t*)espnow_message, strlen(espnow_message));
+                  delay(100); // Delay de 100ms antes de enviar a próxima mensagem
+  
+                if (result == ESP_OK) {
+                  Serial.println("Mensagem ESPNOW enviada com sucesso");
+                  g_state = START_STREAM;
+                  client.send("STREAMING");
+                } else {
+                  Serial.println("Erro ao enviar a mensagem ESPNOW");
+                }
+              
               // delay(5000); // Espera 5 segundos antes de enviar novamente
 
             }
@@ -672,6 +768,8 @@ void loop()
             {
               client.send("ROSTO NÃO RECONHECIDO");
             }
+
+  
           }
           dl_matrix3d_free(out_res.face_id);
           // g_state = START_STREAM;
