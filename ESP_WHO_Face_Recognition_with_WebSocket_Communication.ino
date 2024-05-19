@@ -1,7 +1,4 @@
 
-// esp 32-cam Endereço MAC: 24:DC:C3:AC:AD:FC
-// esp32 Endereço MAC: EC:64:C9:85:AE:B4
-//segunda esp 32-cam Endereço MAC: a0:a3:b3:2b:da:a0
 // fd_forward.h: No such file or directory
 // https://www.youtube.com/watch?v=knxe3zkd6rA
 // esp32 em 1.0.6
@@ -20,20 +17,34 @@
 #include <WiFi.h>
 #include "SPIFFS.h"
 
-#include "FS.h"
-#include "SD_MMC.h"
+// Estrutura para receber e enviar mensagens
+typedef struct {
+  char message_esp[32]; // Mensagem a ser recebida e enviada
+} test_struct;
+
+// Declaração da variável global
+char espnow_message[32] = {0};  // Inicializada com zero
+
+test_struct receivedData;  // Dados recebidosf
+test_struct sendData = {"Hello from ESP32-2"};  // Mensagem inicial a ser enviada
+
+// MAC Address do seu receptor
+uint8_t partnerMacAddress[] = {0x30, 0xC9, 0x22, 0x27, 0xDA, 0xA8};
+
+esp_now_peer_info_t peerInfo;
 
 
+// Definição do nome do dispositivo
 #define DEVICE_NAME "ESP32CAM"
+#define LED_PIN 4  // Define o pino do LED
 
-uint8_t partnerMacAddress[] = {0xEC, 0x64, 0xC9, 0x85, 0xAE, 0xB4};
+ IPAddress local_IP(10, 0, 0, 253);
+ IPAddress gateway(10, 0, 0, 1);
 
-IPAddress local_IP(192, 168, 15, 253);
-IPAddress gateway(192, 168, 15, 1);
 IPAddress subnet(255, 255, 0, 0);
 
-const char *ssid = "VIVOFIBRA-5221";
-const char *password = "kPcsBo9tdC";
+ const char *ssid = "INTELBRAS";
+ const char *password = "Anaenena";
 
 #define ENROLL_CONFIRM_TIMES 5
 #define FACE_ID_SAVE_NUMBER 7
@@ -106,15 +117,64 @@ typedef struct
 
 httpd_resp_value st_name;
 
+
+  WebsocketsClient connectedClient;  // Global client to send data to
+
+#define MAX_RETRIES 3
+int retry_count = 0;
+
+void OnDataSent(const uint8_t *mac_addr, esp_now_send_status_t status) {
+  Serial.print("\r\nStatus do último pacote enviado:\t");
+  if (status == ESP_NOW_SEND_SUCCESS) {
+    Serial.println("Sucesso na entrega");
+    retry_count = 0; // Reset retry count on successful send
+  } else {
+    Serial.println("Falha na entrega");
+    if (retry_count < MAX_RETRIES) {
+      retry_count++;
+      Serial.print("Tentativa de reenvio #: ");
+      Serial.println(retry_count);
+
+      esp_now_send(partnerMacAddress, (uint8_t*)espnow_message, strlen(espnow_message));
+    } else {
+      Serial.println("Falha após várias tentativas.");
+      retry_count = 0; // Reset retry count after max retries
+    }
+  }
+}
+
 // Função de callback para processar mensagens recebidas
 void OnDataRecv(const uint8_t *mac_addr, const uint8_t *data, int data_len) {
+
   Serial.print("Mensagem ESPNOW recebida de ");
   Serial.print(DEVICE_NAME);
   Serial.print(": ");
   Serial.println((char*)data);
 
   // Convertendo os dados recebidos para uma string para fácil comparação
-  String command = String((char*)data);
+  String dataStr = String((char*)data);
+
+   // Encontra a posição do delimitador ':'
+  int delimiterIndex = dataStr.indexOf(':');
+
+  // Se o delimitador não for encontrado, imprime um erro e retorna
+  if (delimiterIndex == -1) {
+//    Serial.println("Delimitador ':' não encontrado na mensagem!");
+    return;
+  }
+
+  // Extrai a parte do comando, que está antes do delimitador
+  String command = dataStr.substring(0, delimiterIndex);
+
+  // Extrai os dados adicionais, que estão depois do delimitador
+  String additionalData = dataStr.substring(delimiterIndex + 1);
+  additionalData.trim(); // Aplica trim para remover espaços iniciais
+
+  Serial.print("Comando: ");
+  Serial.println(command);
+  Serial.print("Número do cartão: ");
+  Serial.println(additionalData);
+  
 
   // Verifica a mensagem e define o estado global g_state apropriadamente
   if (command == "start_stream") {
@@ -125,13 +185,16 @@ void OnDataRecv(const uint8_t *mac_addr, const uint8_t *data, int data_len) {
     g_state = SHOW_FACES;
   } else if (command == "start_recognition") {
     g_state = START_RECOGNITION;
-//    char person[FACE_ID_SAVE_NUMBER * ENROLL_NAME_LEN] = {0};
-//    command.toCharArray(person, sizeof(person));
-//    memcpy(st_name.enroll_name, person, strlen(person) + 1);
-//    Serial.println("Dados de usuário capturados: ");
-//    Serial.println(st_name.enroll_name);
-  } else if (command == "start_enroll") {
-    g_state = START_ENROLL;
+  } else if (command == "capture") {
+
+     // Send the message via WebSocket if the client is available
+
+    handle_message1(connectedClient, String(dataStr));
+    Serial.println("Websocket enviado");
+    
+//  }
+  
+
   } else if (command == "enroll_complete") {
     g_state = ENROLL_COMPLETE;
   } else if (command == "delete_all") {
@@ -143,7 +206,7 @@ void OnDataRecv(const uint8_t *mac_addr, const uint8_t *data, int data_len) {
 
   // Informa o estado atual baseado na mensagem recebida
   Serial.print("Estado atual: ");
-  switch(g_state) {
+  switch (g_state) {
     case START_STREAM:
       Serial.println("Iniciando transmissão...");
       break;
@@ -188,18 +251,21 @@ void setup()
     return;
   }
 
-  // Escreve no arquivo
-  file.println("Hello, SD card!");
-  file.close();
+void setup()
+{
 
-  Serial.println("Escrita concluída");
 
+  pinMode(LED_PIN, OUTPUT);  // Configura o pino do LED como saída
 
   if (!SPIFFS.begin(true)) {
     Serial.println("An Error has occurred while mounting SPIFFS");
     return;
-}
-Serial.println("SPIFFS mounted successfully.");  // Log de sucesso
+  }
+  Serial.println("SPIFFS mounted successfully.");  // Log de sucesso
+
+  logFileDetails(); // Listar arquivos e seus tamanhos
+  logFileSystemInfo(); // Logar espaço total, usado e livre
+
 
   Serial.setDebugOutput(true);
 
@@ -285,25 +351,26 @@ Serial.println("SPIFFS mounted successfully.");  // Log de sucesso
   Serial.println("");
   Serial.println("WiFi connected");
 
-// Inicializar o ESP-NOW
+  // Inicializar o ESP-NOW
   if (esp_now_init() != ESP_OK) {
     Serial.println("Erro ao inicializar o ESP-NOW");
     return;
   }
 
-   // Configurar a função de callback para receber mensagens
-  esp_now_register_recv_cb(OnDataRecv);
+  esp_now_register_send_cb(OnDataSent);
 
-  // Registrar o parceiro
-  // esp_now_peer_info_t peerInfo;
   memcpy(peerInfo.peer_addr, partnerMacAddress, 6);
-  peerInfo.channel = 0;
+  peerInfo.channel = 0;  
   peerInfo.encrypt = false;
 
   if (esp_now_add_peer(&peerInfo) != ESP_OK) {
-    Serial.println("Falha ao adicionar o parceiro");
+    Serial.println("Failed to add peer");
     return;
   }
+
+  // Configurar a função de callback para receber mensagens
+  esp_now_register_recv_cb(OnDataRecv);
+
   // Se chegou aqui, significa que o parceiro foi adicionado com sucesso.
   Serial.println("Parceiro adicionado com sucesso!");
 
@@ -311,9 +378,9 @@ Serial.println("SPIFFS mounted successfully.");  // Log de sucesso
   app_facenet_main();
   socket_server.listen(82);
 
-  Serial.print("Camera Ready! Use 'http://");
+  Serial.print("Câmera pronta! Use 'http://");
   Serial.print(WiFi.localIP());
-  Serial.println("' to connect");
+  Serial.println("' conectar");
 }
 
 
@@ -325,10 +392,11 @@ static esp_err_t index_handler(httpd_req_t *req)
 }
 
 httpd_uri_t index_uri = {
-    .uri = "/",
-    .method = HTTP_GET,
-    .handler = index_handler,
-    .user_ctx = NULL};
+  .uri = "/",
+  .method = HTTP_GET,
+  .handler = index_handler,
+  .user_ctx = NULL
+};
 
 void app_httpserver_init()
 {
@@ -368,13 +436,18 @@ static inline int do_enrollment(face_id_name_list *face_list, dl_matrix3d_t *new
 
   Serial.println("Attempting to enroll new face...");
   int left_sample_face = enroll_face_id_to_flash_with_name(face_list, new_id, st_name.enroll_name);
- Serial.println("Saving face data...");
-bool result = enroll_face_id_to_flash_with_name(&st_face_list, new_id, st_name.enroll_name);
-if (result) {
+  Serial.println("Saving face data...");
+  bool result = enroll_face_id_to_flash_with_name(&st_face_list, new_id, st_name.enroll_name);
+  if (result) {
     Serial.println("Face data saved successfully.");
-} else {
+
+    logFileDetails();  // Chama a função para logar os detalhes dos arquivos
+    logFileSystemInfo();  // Chama a função para logar as informações do sistema de arquivos
+
+
+  } else {
     Serial.println("Error saving face data!");
-}
+  }
 
 
 
@@ -429,7 +502,7 @@ void handle_message(WebsocketsClient &client, WebsocketsMessage msg)
     Serial.println("ESPNOW passa por aqui");
 
     char person[FACE_ID_SAVE_NUMBER * ENROLL_NAME_LEN] = {
-        0,
+      0,
     };
     msg.data().substring(8).toCharArray(person, sizeof(person));
     memcpy(st_name.enroll_name, person, strlen(person) + 1);
@@ -458,10 +531,56 @@ void handle_message(WebsocketsClient &client, WebsocketsMessage msg)
   }
 }
 
+void handle_message1(WebsocketsClient &client, const String &data) {
+  if (data == "stream") {
+    g_state = START_STREAM;
+    client.send("STREAMING");
+  } else if (data == "detect") {
+    g_state = START_DETECT;
+    client.send("DETECTING");
+  } else if (data.startsWith("capture:")) {
+    g_state = START_ENROLL;
+     Serial.println("PASSED START_ENROLL");
+//-----------
+ // Alocando o array de caracteres para o nome da pessoa
+    char person[FACE_ID_SAVE_NUMBER * ENROLL_NAME_LEN] = {0};
+
+    // Extraindo o nome da pessoa a partir do comando
+    String personName = data.substring(8);
+    personName.toCharArray(person, sizeof(person));
+
+    // Copiando o nome para a variável de estrutura (assumindo que st_name é uma estrutura disponível)
+    memcpy(st_name.enroll_name, person, strlen(person) + 1);
+
+    // Enviando a resposta de captura para o cliente WebSocket
+    client.send("CAPTURING");
+    
+//    -------------------
+//    client.send("CAPTURING");
+  } else if (data == "recognise") {
+    g_state = START_RECOGNITION;
+    client.send("RECOGNISING");
+  } else if (data.startsWith("remove:")) {
+    // Processamento específico de 'remove'
+    client.send("REMOVED");
+  } else if (data == "delete_all") {
+    // Processamento específico de 'delete_all'
+    client.send("ALL DELETED");
+  } else {
+    client.send("COMMAND UNKNOWN");
+  }
+}
+
+void blinkLed() {
+    digitalWrite(LED_PIN, HIGH);  // Acende o LED
+    delay(200);                  // Mantém o LED aceso por 200 milissegundos
+    digitalWrite(LED_PIN, LOW);   // Apaga o LED
+}
+
+
 void loop()
 {
-
-   auto client = socket_server.accept();
+  auto client = socket_server.accept();
   client.onMessage(handle_message);
   dl_matrix3du_t *image_matrix = dl_matrix3du_alloc(1, 320, 240, 3);
   http_img_process_result out_res = {0};
@@ -523,26 +642,32 @@ void loop()
               sprintf(recognised_message, "RECONHECIDO %s", f->id_name);
               client.send(recognised_message);
 
-              // Enviar a mensagem
-              const char* message = "RECOGNISED";
-              esp_err_t result = esp_now_send(partnerMacAddress, (uint8_t*)message, strlen(message));
-              if (result == ESP_OK) {
-                Serial.println("Mensagem ESPNOW enviada com sucesso");
-              } else {
-                Serial.println("Erro ao enviar a mensagem ESPNOW");
-              }
+              // Chame a função blinkLed() para piscar o LED
+              blinkLed();
 
+
+                  sprintf(espnow_message, "RECOGNISED: %s", f->id_name);  // Formata a string com o id_name
+
+                  esp_err_t result = esp_now_send(partnerMacAddress, (uint8_t*)espnow_message, strlen(espnow_message));
+  
+                if (result == ESP_OK) {
+                  Serial.println("Mensagem enviada para ESP32 com sucesso");
+                  g_state = START_STREAM;
+                  client.send("STREAMING");
+                } else {
+                  Serial.println("Erro ao enviar a mensagem para ESP32");
+                }
               
-              // delay(5000); // Espera 5 segundos antes de enviar novamente
-
             }
             else
             {
               client.send("ROSTO NÃO RECONHECIDO");
             }
+
+  
           }
           dl_matrix3d_free(out_res.face_id);
-          // g_state = START_STREAM;
+
         }
       }
       else
@@ -564,6 +689,5 @@ void loop()
     esp_camera_fb_return(fb);
     fb = NULL;
   }
-
 
 }
