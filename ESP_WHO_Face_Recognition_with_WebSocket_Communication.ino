@@ -1,9 +1,4 @@
 
-// esp 32-cam Endereço MAC: 24:DC:C3:AC:AD:FC
-// esp32 Endereço MAC: EC:64:C9:85:AE:B4
-//NOVA ESP32 MAC: 30:c9:22:27:da:a8
-
-
 // fd_forward.h: No such file or directory
 // https://www.youtube.com/watch?v=knxe3zkd6rA
 
@@ -19,12 +14,9 @@
 #include "fd_forward.h"
 #include "fr_forward.h"
 #include "fr_flash.h"
-// #include <Arduino.h>
-// #include <addons/TokenHelper.h>
 #include <esp_now.h>
 #include <WiFi.h>
 #include "SPIFFS.h"
-//parametro##################
 
 // Estrutura para receber e enviar mensagens
 typedef struct {
@@ -43,55 +35,17 @@ uint8_t partnerMacAddress[] = {0x30, 0xC9, 0x22, 0x27, 0xDA, 0xA8};
 esp_now_peer_info_t peerInfo;
 
 
-// #include <Firebase_ESP_Client.h>
-// Provide the token generation process info.
-// #include "addons/TokenHelper.h"
-//Provide the RTDB payload printing info and other helper functions.
-// #include "addons/RTDBHelper.h"
-
 // Definição do nome do dispositivo
 #define DEVICE_NAME "ESP32CAM"
 #define LED_PIN 4  // Define o pino do LED
 
-
-
-
  IPAddress local_IP(10, 0, 0, 253);
  IPAddress gateway(10, 0, 0, 1);
-//
-//IPAddress local_IP(192, 168, 15, 253);
-//IPAddress gateway(192, 168, 15, 1);
+
 IPAddress subnet(255, 255, 0, 0);
 
  const char *ssid = "INTELBRAS";
  const char *password = "Anaenena";
-
-//const char *ssid = "VIVOFIBRA-5221";
-//const char *password = "kPcsBo9tdC";
-
-
-//const char *ssid = "Galaxy AB";
-//const char *password = "Anaenena";
-
-// Insert Firebase project API Key
-// #define API_KEY "AIzaSyAJn68X4FRmxdk8NMu0ir9LwRsrIr7j7F0"
-
-// Insert RTDB URLefine the RTDB URL */
-// #define DATABASE_URL "https://reconhecimento-facial-cbae7-default-rtdb.firebaseio.com"
-
-// #define USER_EMAIL "aleks.brandao@gmail.com"
-// #define USER_PASSWORD "reconhecimento"
-
-//Define Firebase Data object
-// FirebaseData fbdo;
-
-// FirebaseAuth auth;
-// FirebaseConfig config;
-
-// unsigned long sendDataPrevMillis = 0;
-// int count = 0;
-// bool signupOK = false;
-
 
 #define ENROLL_CONFIRM_TIMES 5
 #define FACE_ID_SAVE_NUMBER 7
@@ -171,12 +125,6 @@ httpd_resp_value st_name;
 
   WebsocketsClient connectedClient;  // Global client to send data to
 
-  // Callback quando dados são enviados
-//void OnDataSent(const uint8_t *mac_addr, esp_now_send_status_t status) {
-//  Serial.print("\r\nStatus do último pacote enviado:\t");
-//  Serial.println(status == ESP_NOW_SEND_SUCCESS ? "Sucesso na entrega" : "Falha na entrega");
-//}
-
 #define MAX_RETRIES 3
 int retry_count = 0;
 
@@ -191,8 +139,7 @@ void OnDataSent(const uint8_t *mac_addr, esp_now_send_status_t status) {
       retry_count++;
       Serial.print("Tentativa de reenvio #: ");
       Serial.println(retry_count);
-      // Reenviar os dados
-//      esp_now_send(mac_addr, last_message, last_message_size);
+
       esp_now_send(partnerMacAddress, (uint8_t*)espnow_message, strlen(espnow_message));
     } else {
       Serial.println("Falha após várias tentativas.");
@@ -204,14 +151,6 @@ void OnDataSent(const uint8_t *mac_addr, esp_now_send_status_t status) {
 // Função de callback para processar mensagens recebidas
 void OnDataRecv(const uint8_t *mac_addr, const uint8_t *data, int data_len) {
 
-//    if (data_len == sizeof(test_struct)) {
-//    memcpy(&receivedData, data, data_len);
-//    Serial.print("Mensagem recebida: ");
-//    Serial.println(receivedData.message_esp);
-//  } else {
-//    Serial.println("Received data does not match expected size!");
-//  }
-  
   Serial.print("Mensagem ESPNOW recebida de ");
   Serial.print(DEVICE_NAME);
   Serial.print(": ");
@@ -254,14 +193,13 @@ void OnDataRecv(const uint8_t *mac_addr, const uint8_t *data, int data_len) {
   } else if (command == "capture") {
 
      // Send the message via WebSocket if the client is available
-//  if(connectedClient.available()) {
-//    connectedClient.send("capture:teste");
+
     handle_message1(connectedClient, String(dataStr));
     Serial.println("Websocket enviado");
     
 //  }
   
-//    g_state = START_ENROLL;
+
   } else if (command == "enroll_complete") {
     g_state = ENROLL_COMPLETE;
   } else if (command == "delete_all") {
@@ -328,8 +266,6 @@ void logFileSystemInfo() {
 
 
 
-//esp_now_peer_info_t peerInfo;
-
 void setup()
 {
 
@@ -389,8 +325,6 @@ void setup()
     config.fb_count = 1;
   }
 
-  //#if defined(CAMERA_MODEL_ESP_EYE): Esta diretiva de pré-processador verifica se o símbolo CAMERA_MODEL_ESP_EYE está definido. Isso geralmente é feito através de definições condicionais
-
 #if defined(CAMERA_MODEL_ESP_EYE)
 
   pinMode(13, INPUT_PULLUP);
@@ -410,8 +344,6 @@ void setup()
   sensor_t *s = esp_camera_sensor_get();
 
   s->set_framesize(s, FRAMESIZE_QVGA);
-
-  //#if defined(CAMERA_MODEL_M5STACK_WIDE): Esta diretiva de pré-processador verifica se o símbolo CAMERA_MODEL_M5STACK_WIDE está definido, indicando que o modelo da câmera é o "M5Stack Wide".
 
 #if defined(CAMERA_MODEL_M5STACK_WIDE)
 
@@ -455,16 +387,6 @@ void setup()
   // Configurar a função de callback para receber mensagens
   esp_now_register_recv_cb(OnDataRecv);
 
-//  // Registrar o parceiro
-//  // esp_now_peer_info_t peerInfo;
-//  memcpy(peerInfo.peer_addr, partnerMacAddress, 6);
-//  peerInfo.channel = 0;
-//  peerInfo.encrypt = false;
-//
-//  if (esp_now_add_peer(&peerInfo) != ESP_OK) {
-//    Serial.println("Falha ao adicionar o parceiro");
-//    return;
-//  }
   // Se chegou aqui, significa que o parceiro foi adicionado com sucesso.
   Serial.println("Parceiro adicionado com sucesso!");
 
@@ -476,30 +398,6 @@ void setup()
   Serial.print(WiFi.localIP());
   Serial.println("' conectar");
 }
-
-/* Assign the api key (required) */
-// config.api_key = API_KEY;
-
-/* Assign the RTDB URL (required) */
-// config.database_url = DATABASE_URL;
-
-// auth.user.email = USER_EMAIL;
-// auth.user.password = USER_PASSWORD;
-
-/* Sign up */
-// if (base.signUp(&config, &auth, "", "")){
-//   Serial.println("ok");
-//   signupOK = true;
-// }
-// else{
-//   Serial.printf("%s\n", config.signer.signupError.message.c_str());
-// }
-
-// /* Assign the callback function for the long running token generation task */
-// config.token_status_callback = tokenStatusCallback; //see addons/TokenHelper.h
-
-// Firebase.begin(&config, &auth);
-// Firebase.reconnectWiFi(true);
 
 
 static esp_err_t index_handler(httpd_req_t *req)
@@ -625,19 +523,6 @@ void handle_message(WebsocketsClient &client, WebsocketsMessage msg)
     client.send("CAPTURING");
   }
 
-  // if (msg.data().substring(0, 12) == "START_ENROLL") { // Checa se o comando é START_ENROLL
-  //   g_state = START_ENROLL; // Define o estado global para iniciar o cadastro
-
-  //   // Preparação do array de caracteres para receber o nome após o comando
-  //   char person[FACE_ID_SAVE_NUMBER * ENROLL_NAME_LEN] = {0};
-  //   msg.data().substring(13).toCharArray(person, sizeof(person)); // Extrai o nome após "START_ENROLL:"
-  //   memcpy(st_name.enroll_name, person, strlen(person) + 1); // Copia o nome extraído para st_name.enroll_name
-
-  //   // Comunica de volta que o processo de captura está ativo
-  //   client.send("CAPTURING"); // Supondo que 'client' é uma instância válida de um objeto que pode enviar mensagens
-  // }
-
-
   if (msg.data() == "recognise")
   {
     g_state = START_RECOGNITION;
@@ -709,44 +594,6 @@ void blinkLed() {
 
 void loop()
 {
-
-  // if (Firebase.ready() && signupOK && (millis() - sendDataPrevMillis > 60000 || sendDataPrevMillis == 0)){
-  //   sendDataPrevMillis = millis();
-  //   // Write an Int number on the database path test/int
-  //   if (Firebase.RTDB.pushInt(&fbdo, "test/int", count)){
-  //     Serial.println("PASSED");
-  //     Serial.println("PATH: " + fbdo.dataPath());
-  //     Serial.println("TYPE: " + fbdo.dataType());
-  //   }
-  //   else {
-  //     Serial.println("FAILED");
-  //     Serial.println("REASON: " + fbdo.errorReason());
-  //   }
-  //   count++;
-
-  //   // Write an Float number on the database path test/float
-  //   if (Firebase.RTDB.pushFloat(&fbdo, "test/float", 0.01 + random(0,100))){
-  //     Serial.println("PASSED");
-  //     Serial.println("PATH: " + fbdo.dataPath());
-  //     Serial.println("TYPE: " + fbdo.dataType());
-  //   }
-  //   else {
-  //     Serial.println("FAILED");
-  //     Serial.println("REASON: " + fbdo.errorReason());
-  //   }
-
-  //    if (Firebase.RTDB.pushDev(&fbdo, "test/Dev", DEVICE_NAME)){
-  //     Serial.println("PASSED");
-  //     Serial.println("PATH: " + fbdo.dataPath());
-  //     Serial.println("TYPE: " + fbdo.dataType());
-  //   }
-  //   else {
-  //     Serial.println("FAILED");
-  //     Serial.println("REASON: " + fbdo.errorReason());
-  //   }
-
-  // }
-
   auto client = socket_server.accept();
   client.onMessage(handle_message);
   dl_matrix3du_t *image_matrix = dl_matrix3du_alloc(1, 320, 240, 3);
@@ -812,15 +659,10 @@ void loop()
               // Chame a função blinkLed() para piscar o LED
               blinkLed();
 
-              // Enviar a mensagem
-//              const char* message = "RECOGNISED";
-//                  char espnow_message[64];  // Certifique-se de que o buffer é grande o suficiente.
+
                   sprintf(espnow_message, "RECOGNISED: %s", f->id_name);  // Formata a string com o id_name
-//                  delay(100); // Delay de 100ms antes de enviar a próxima mensagem
-  
-  //              esp_err_t result = esp_now_send(partnerMacAddress, (uint8_t*)message, strlen(message));
+
                   esp_err_t result = esp_now_send(partnerMacAddress, (uint8_t*)espnow_message, strlen(espnow_message));
-//                  delay(100); // Delay de 100ms antes de enviar a próxima mensagem
   
                 if (result == ESP_OK) {
                   Serial.println("Mensagem enviada para ESP32 com sucesso");
@@ -830,8 +672,6 @@ void loop()
                   Serial.println("Erro ao enviar a mensagem para ESP32");
                 }
               
-              // delay(5000); // Espera 5 segundos antes de enviar novamente
-
             }
             else
             {
@@ -841,7 +681,7 @@ void loop()
   
           }
           dl_matrix3d_free(out_res.face_id);
-          // g_state = START_STREAM;
+
         }
       }
       else
@@ -863,16 +703,5 @@ void loop()
     esp_camera_fb_return(fb);
     fb = NULL;
   }
-
-  // // Enviar a mensagem
-  // const char* message = "Hello World";
-  // esp_err_t result = esp_now_send(partnerMacAddress, (uint8_t*)message, strlen(message));
-  // if (result == ESP_OK) {
-  //   Serial.println("Mensagem ESPNOW enviada com sucesso");
-  // } else {
-  //   Serial.println("Erro ao enviar a mensagem ESPNOW");
-  // }
-
-  // delay(5000); // Espera 5 segundos antes de enviar novamente
 
 }
