@@ -1,6 +1,8 @@
 
 // esp 32-cam Endereço MAC: 24:DC:C3:AC:AD:FC
 // esp32 Endereço MAC: EC:64:C9:85:AE:B4
+//NOVA ESP32 MAC: 30:c9:22:27:da:a8
+
 
 // fd_forward.h: No such file or directory
 // https://www.youtube.com/watch?v=knxe3zkd6rA
@@ -22,6 +24,23 @@
 #include <esp_now.h>
 #include <WiFi.h>
 #include "SPIFFS.h"
+//parametro##################
+
+// Estrutura para receber e enviar mensagens
+typedef struct {
+  char message_esp[32]; // Mensagem a ser recebida e enviada
+} test_struct;
+
+// Declaração da variável global
+char espnow_message[32] = {0};  // Inicializada com zero
+
+test_struct receivedData;  // Dados recebidosf
+test_struct sendData = {"Hello from ESP32-2"};  // Mensagem inicial a ser enviada
+
+// MAC Address do seu receptor
+uint8_t partnerMacAddress[] = {0x30, 0xC9, 0x22, 0x27, 0xDA, 0xA8};
+
+esp_now_peer_info_t peerInfo;
 
 
 // #include <Firebase_ESP_Client.h>
@@ -34,7 +53,8 @@
 #define DEVICE_NAME "ESP32CAM"
 #define LED_PIN 4  // Define o pino do LED
 
-uint8_t partnerMacAddress[] = {0xEC, 0x64, 0xC9, 0x85, 0xAE, 0xB4};
+
+
 
  IPAddress local_IP(10, 0, 0, 253);
  IPAddress gateway(10, 0, 0, 1);
@@ -150,8 +170,48 @@ httpd_resp_value st_name;
 
 
   WebsocketsClient connectedClient;  // Global client to send data to
+
+  // Callback quando dados são enviados
+//void OnDataSent(const uint8_t *mac_addr, esp_now_send_status_t status) {
+//  Serial.print("\r\nStatus do último pacote enviado:\t");
+//  Serial.println(status == ESP_NOW_SEND_SUCCESS ? "Sucesso na entrega" : "Falha na entrega");
+//}
+
+#define MAX_RETRIES 3
+int retry_count = 0;
+
+void OnDataSent(const uint8_t *mac_addr, esp_now_send_status_t status) {
+  Serial.print("\r\nStatus do último pacote enviado:\t");
+  if (status == ESP_NOW_SEND_SUCCESS) {
+    Serial.println("Sucesso na entrega");
+    retry_count = 0; // Reset retry count on successful send
+  } else {
+    Serial.println("Falha na entrega");
+    if (retry_count < MAX_RETRIES) {
+      retry_count++;
+      Serial.print("Tentativa de reenvio #: ");
+      Serial.println(retry_count);
+      // Reenviar os dados
+//      esp_now_send(mac_addr, last_message, last_message_size);
+      esp_now_send(partnerMacAddress, (uint8_t*)espnow_message, strlen(espnow_message));
+    } else {
+      Serial.println("Falha após várias tentativas.");
+      retry_count = 0; // Reset retry count after max retries
+    }
+  }
+}
+
 // Função de callback para processar mensagens recebidas
 void OnDataRecv(const uint8_t *mac_addr, const uint8_t *data, int data_len) {
+
+//    if (data_len == sizeof(test_struct)) {
+//    memcpy(&receivedData, data, data_len);
+//    Serial.print("Mensagem recebida: ");
+//    Serial.println(receivedData.message_esp);
+//  } else {
+//    Serial.println("Received data does not match expected size!");
+//  }
+  
   Serial.print("Mensagem ESPNOW recebida de ");
   Serial.print(DEVICE_NAME);
   Serial.print(": ");
@@ -165,7 +225,7 @@ void OnDataRecv(const uint8_t *mac_addr, const uint8_t *data, int data_len) {
 
   // Se o delimitador não for encontrado, imprime um erro e retorna
   if (delimiterIndex == -1) {
-    Serial.println("Delimitador ':' não encontrado na mensagem!");
+//    Serial.println("Delimitador ':' não encontrado na mensagem!");
     return;
   }
 
@@ -178,7 +238,7 @@ void OnDataRecv(const uint8_t *mac_addr, const uint8_t *data, int data_len) {
 
   Serial.print("Comando: ");
   Serial.println(command);
-  Serial.print("Dados Adicionais: ");
+  Serial.print("Número do cartão: ");
   Serial.println(additionalData);
   
 
@@ -268,7 +328,7 @@ void logFileSystemInfo() {
 
 
 
-esp_now_peer_info_t peerInfo;
+//esp_now_peer_info_t peerInfo;
 
 void setup()
 {
@@ -381,21 +441,30 @@ void setup()
     return;
   }
 
+  esp_now_register_send_cb(OnDataSent);
 
+  memcpy(peerInfo.peer_addr, partnerMacAddress, 6);
+  peerInfo.channel = 0;  
+  peerInfo.encrypt = false;
+
+  if (esp_now_add_peer(&peerInfo) != ESP_OK) {
+    Serial.println("Failed to add peer");
+    return;
+  }
 
   // Configurar a função de callback para receber mensagens
   esp_now_register_recv_cb(OnDataRecv);
 
-  // Registrar o parceiro
-  // esp_now_peer_info_t peerInfo;
-  memcpy(peerInfo.peer_addr, partnerMacAddress, 6);
-  peerInfo.channel = 0;
-  peerInfo.encrypt = false;
-
-  if (esp_now_add_peer(&peerInfo) != ESP_OK) {
-    Serial.println("Falha ao adicionar o parceiro");
-    return;
-  }
+//  // Registrar o parceiro
+//  // esp_now_peer_info_t peerInfo;
+//  memcpy(peerInfo.peer_addr, partnerMacAddress, 6);
+//  peerInfo.channel = 0;
+//  peerInfo.encrypt = false;
+//
+//  if (esp_now_add_peer(&peerInfo) != ESP_OK) {
+//    Serial.println("Falha ao adicionar o parceiro");
+//    return;
+//  }
   // Se chegou aqui, significa que o parceiro foi adicionado com sucesso.
   Serial.println("Parceiro adicionado com sucesso!");
 
@@ -403,9 +472,9 @@ void setup()
   app_facenet_main();
   socket_server.listen(82);
 
-  Serial.print("Camera Ready! Use 'http://");
+  Serial.print("Câmera pronta! Use 'http://");
   Serial.print(WiFi.localIP());
-  Serial.println("' to connect");
+  Serial.println("' conectar");
 }
 
 /* Assign the api key (required) */
@@ -418,7 +487,7 @@ void setup()
 // auth.user.password = USER_PASSWORD;
 
 /* Sign up */
-// if (Firebase.signUp(&config, &auth, "", "")){
+// if (base.signUp(&config, &auth, "", "")){
 //   Serial.println("ok");
 //   signupOK = true;
 // }
@@ -745,20 +814,20 @@ void loop()
 
               // Enviar a mensagem
 //              const char* message = "RECOGNISED";
-                  char espnow_message[64];  // Certifique-se de que o buffer é grande o suficiente.
+//                  char espnow_message[64];  // Certifique-se de que o buffer é grande o suficiente.
                   sprintf(espnow_message, "RECOGNISED: %s", f->id_name);  // Formata a string com o id_name
-                  delay(100); // Delay de 100ms antes de enviar a próxima mensagem
+//                  delay(100); // Delay de 100ms antes de enviar a próxima mensagem
   
   //              esp_err_t result = esp_now_send(partnerMacAddress, (uint8_t*)message, strlen(message));
                   esp_err_t result = esp_now_send(partnerMacAddress, (uint8_t*)espnow_message, strlen(espnow_message));
-                  delay(100); // Delay de 100ms antes de enviar a próxima mensagem
+//                  delay(100); // Delay de 100ms antes de enviar a próxima mensagem
   
                 if (result == ESP_OK) {
-                  Serial.println("Mensagem ESPNOW enviada com sucesso");
+                  Serial.println("Mensagem enviada para ESP32 com sucesso");
                   g_state = START_STREAM;
                   client.send("STREAMING");
                 } else {
-                  Serial.println("Erro ao enviar a mensagem ESPNOW");
+                  Serial.println("Erro ao enviar a mensagem para ESP32");
                 }
               
               // delay(5000); // Espera 5 segundos antes de enviar novamente
